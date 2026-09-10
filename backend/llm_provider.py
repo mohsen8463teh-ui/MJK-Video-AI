@@ -2,65 +2,44 @@ import json
 import os
 import urllib.error
 import urllib.request
-from typing import Any, Dict
 
 
-class LLMProviderError(RuntimeError):
+class LLMProviderError(Exception):
     pass
 
 
 class OpenRouterProvider:
-    """Dependency-free OpenRouter chat-completions client."""
-
     def __init__(self):
         self.api_key = os.getenv("OPENROUTER_API_KEY", "").strip()
         self.base_url = os.getenv(
             "OPENROUTER_BASE_URL",
-            "https://openrouter.ai/api/v1",
+            "https://openrouter.ai/api/v1"
         ).rstrip("/")
-        self.model = os.getenv(
-            "OPENROUTER_MODEL",
-            "openrouter/free",
-        ).strip()
-
-    @property
-    def configured(self):
-        return bool(self.api_key and self.model)
-
-    def describe(self):
-        return {
-            "id": "openrouter",
-            "configured": self.configured,
-            "provider": "OpenRouter",
-            "model": self.model if self.configured else None,
-            "status": "ready" if self.configured else "not_configured",
-        }
+        self.model = os.getenv("OPENROUTER_MODEL", "openrouter/free")
+        self.configured = bool(self.api_key)
 
     def generate_json(
         self,
-        system_instruction: str,
-        user_request: Dict[str, Any],
-        response_schema: Dict[str, Any],
+        system_instruction,
+        user_request,
+        response_schema=None,
     ):
         if not self.configured:
-            raise LLMProviderError("LLM provider is not configured")
+            raise LLMProviderError("OPENROUTER_API_KEY is not configured")
 
         schema_text = json.dumps(
-            response_schema,
-            ensure_ascii=False
-        )
-        user_text = json.dumps(
-            user_request,
-            ensure_ascii=False
+            response_schema or {},
+            ensure_ascii=False,
+            separators=(",", ":"),
         )
 
         prompt = (
-            "Return ONLY valid JSON. "
-            "Do not use Markdown fences.\n\n"
+            "Return ONLY valid JSON. Do not use Markdown fences. "
+            "Do not add explanations before or after the JSON.\n\n"
             "Required JSON schema description:\n"
             f"{schema_text}\n\n"
             "User video request:\n"
-            f"{user_text}"
+            f"{user_request}"
         )
 
         payload = {
@@ -75,17 +54,19 @@ class OpenRouterProvider:
                     "content": prompt,
                 },
             ],
-            "temperature": 0.7,
+            "response_format": {
+                "type": "json_object"
+            },
         }
 
-        body = json.dumps(
+        data = json.dumps(
             payload,
-            ensure_ascii=False
+            ensure_ascii=False,
         ).encode("utf-8")
 
-        req = urllib.request.Request(
+        request = urllib.request.Request(
             f"{self.base_url}/chat/completions",
-            data=body,
+            data=data,
             method="POST",
             headers={
                 "Authorization": f"Bearer {self.api_key}",
@@ -94,57 +75,68 @@ class OpenRouterProvider:
         )
 
         try:
-            with urllib.request.urlopen(
-                req,
-                timeout=90
-            ) as response:
+            with urllib.request.urlopen(request, timeout=120) as response:
                 raw = response.read().decode("utf-8")
+
         except urllib.error.HTTPError as exc:
-            detail = exc.read().decode(
-                "utf-8",
-                errors="replace"
-            )[:1000]
+            try:
+                detail = exc.read().decode("utf-8")
+            except Exception:
+                detail = ""
             raise LLMProviderError(
                 f"provider_http_{exc.code}: {detail}"
             ) from exc
-        except (urllib.error.URLError, TimeoutError) as exc:
+
+        except urllib.error.URLError as exc:
             raise LLMProviderError(
-                f"provider_connection_error: {exc}"
+                f"provider_network_error: {exc}"
+            ) from exc
+
+        except TimeoutError as exc:
+            raise LLMProviderError(
+                "provider_timeout"
             ) from exc
 
         try:
-            data = json.loads(raw)
-            content = data["choices"][0]["message"]["content"]
-        except (
-            KeyError,
-            IndexError,
-            TypeError,
-            json.JSONDecodeError,
-        ) as exc:
+            response_data = json.loads(raw)
+        except json.JSONDecodeError as exc:
             raise LLMProviderError(
-                "invalid provider response"
+                "provider returned invalid API JSON"
             ) from exc
+
+        try:
+            content = response_data["choices"][0]["message"]["content"]
+        except (KeyError, IndexError, TypeError) as exc:
+            raise LLMProviderError(
+                "provider response missing message content"
+            ) from exc
+
+        if isinstance(content, list):
+            parts = []
+            for item in content:
+                if isinstance(item, dict) and "text" in item:
+                    parts.append(str(item["text"]))
+                elif isinstance(item, str):
+                    parts.append(item)
+            content = "".join(parts)
 
         if not isinstance(content, str) or not content.strip():
             raise LLMProviderError(
                 "provider returned empty content"
             )
 
-        text = content.strip()
+        content = content.strip()
 
-        if text.startswith("```"):
-            lines = text.splitlines()
-
-            if lines and lines[0].startswith("```"):
+        if content.startswith("```"):
+            lines = content.splitlines()
+            if lines and lines[0].strip().startswith("```"):
                 lines = lines[1:]
-
             if lines and lines[-1].strip() == "```":
                 lines = lines[:-1]
-
-            text = "\n".join(lines).strip()
+            content = "\n".join(lines).strip()
 
         try:
-            result = json.loads(text)
+            result = json.loads(content)
         except json.JSONDecodeError as exc:
             raise LLMProviderError(
                 "provider returned non-JSON content"
