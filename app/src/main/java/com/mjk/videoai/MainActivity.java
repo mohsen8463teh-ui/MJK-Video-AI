@@ -120,6 +120,15 @@ public class MainActivity extends Activity {
         return row;
     }
 
+    private void appendResult(StringBuilder display, String title, String value) {
+        if (value != null && !value.trim().isEmpty()) {
+            display.append(title)
+                    .append(":\n")
+                    .append(value)
+                    .append("\n\n");
+        }
+    }
+
     private void requestDirector(String userPrompt) {
         new Thread(() -> {
             HttpURLConnection connection = null;
@@ -164,52 +173,84 @@ public class MainActivity extends Activity {
                         try {
                             JSONObject json = new JSONObject(result);
                             JSONObject plan = json.optJSONObject("plan");
-                            if (plan == null) {
-                                plan = json;
-                            }
 
                             StringBuilder display = new StringBuilder();
 
-                            if (plan.has("concept")) {
-                                display.append("ایده:\n")
-                                        .append(plan.optString("concept"))
-                                        .append("\n\n");
-                            }
+                            if (plan != null) {
+                                appendResult(display, "ایده", plan.optString("concept", ""));
+                                appendResult(display, "Hook", plan.optString("hook", ""));
+                                appendResult(display, "مخاطب", plan.optString("audience", ""));
+                                appendResult(display, "سناریو", plan.optString("story", ""));
+                                appendResult(display, "CTA", plan.optString("cta", ""));
 
-                            if (plan.has("hook")) {
-                                display.append("Hook:\n")
-                                        .append(plan.optString("hook"))
-                                        .append("\n\n");
-                            }
+                                if (plan.has("characters")) {
+                                    appendResult(display, "شخصیت‌ها",
+                                            plan.optJSONArray("characters") != null
+                                                    ? plan.optJSONArray("characters").toString()
+                                                    : plan.optString("characters", ""));
+                                }
 
-                            if (plan.has("audience")) {
-                                display.append("مخاطب:\n")
-                                        .append(plan.optString("audience"))
-                                        .append("\n\n");
-                            }
+                                if (plan.has("locations")) {
+                                    appendResult(display, "لوکیشن‌ها",
+                                            plan.optJSONArray("locations") != null
+                                                    ? plan.optJSONArray("locations").toString()
+                                                    : plan.optString("locations", ""));
+                                }
 
-                            if (plan.has("story")) {
-                                display.append("سناریو:\n")
-                                        .append(plan.optString("story"))
-                                        .append("\n\n");
-                            }
+                                if (plan.has("scenes")) {
+                                    appendResult(display, "صحنه‌ها",
+                                            plan.optJSONArray("scenes") != null
+                                                    ? plan.optJSONArray("scenes").toString(2)
+                                                    : plan.optString("scenes", ""));
+                                }
 
-                            if (plan.has("cta")) {
-                                display.append("CTA:\n")
-                                        .append(plan.optString("cta"));
+                                appendResult(display, "گویندگی", plan.optString("voiceover", ""));
+                                appendResult(display, "موسیقی", plan.optString("music", ""));
+                                appendResult(display, "افکت‌های صوتی", plan.optString("sound_effects", ""));
+                                appendResult(display, "کپشن", plan.optString("captions", ""));
                             }
 
                             if (display.length() == 0) {
-                                display.append("پاسخ AI دریافت شد، اما محتوای قابل نمایش پیدا نشد.\n\n")
-                                        .append(result);
+                                display.append("پاسخ خام AI:\n\n").append(result);
                             }
+
+                            TextView resultView = new TextView(this);
+                            resultView.setText(display.toString());
+                            resultView.setTextColor(Color.BLACK);
+                            resultView.setTextSize(16);
+                            resultView.setPadding(dp(20), dp(16), dp(20), dp(16));
+                            resultView.setTextIsSelectable(true);
+                            resultView.setGravity(Gravity.RIGHT | Gravity.TOP);
+                            resultView.setLayoutDirection(View.LAYOUT_DIRECTION_RTL);
+
+                            ScrollView resultScroll = new ScrollView(this);
+                            resultScroll.setFillViewport(true);
+                            resultScroll.addView(resultView);
 
                             new AlertDialog.Builder(this)
                                     .setTitle("AI Director")
-                                    .setMessage(display.toString())
+                                    .setView(resultScroll)
                                     .setPositiveButton("باشه", null)
                                     .show();
+
                         } catch (Exception e) {
+                            new AlertDialog.Builder(this)
+                                    .setTitle("AI Director")
+                                    .setMessage("خطا در نمایش پاسخ:\n\n" + e.getMessage()
+                                            + "\n\nپاسخ خام:\n" + result)
+                                    .setPositiveButton("باشه", null)
+                                    .show();
+                        }
+                    } else {
+                        new AlertDialog.Builder(this)
+                                .setTitle("خطا")
+                                .setMessage("Backend پاسخ موفق نداد.\n\nHTTP "
+                                        + finalStatus + "\n\n" + result)
+                                .setPositiveButton("باشه", null)
+                                .show();
+                    }
+                });
+            } catch (Exception e) {
                             new AlertDialog.Builder(this)
                                     .setTitle("AI Director")
                                     .setMessage(result)
