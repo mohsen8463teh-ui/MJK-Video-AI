@@ -164,20 +164,10 @@ public class MainActivity extends Activity {
                         try {
                             JSONObject json = new JSONObject(result);
                             StringBuilder display = new StringBuilder();
-                            if (json.has("concept")) display.append("ایده:
-").append(json.optString("concept")).append("
-
-");
-                            if (json.has("hook")) display.append("Hook:
-").append(json.optString("hook")).append("
-
-");
-                            if (json.has("story")) display.append("سناریو:
-").append(json.optString("story")).append("
-
-");
-                            if (json.has("cta")) display.append("CTA:
-").append(json.optString("cta"));
+                            if (json.has("concept")) display.append("ایده:\\n").append(json.optString("concept")).append("\\n\\n");
+                            if (json.has("hook")) display.append("Hook:\\n").append(json.optString("hook")).append("\\n\\n");
+                            if (json.has("story")) display.append("سناریو:\\n").append(json.optString("story")).append("\\n\\n");
+                            if (json.has("cta")) display.append("CTA:\\n").append(json.optString("cta"));
 
                             new AlertDialog.Builder(this)
                                     .setTitle("AI Director")
@@ -194,11 +184,7 @@ public class MainActivity extends Activity {
                     } else {
                         new AlertDialog.Builder(this)
                                 .setTitle("خطا")
-                                .setMessage("Backend پاسخ موفق نداد.
-
-HTTP " + finalStatus + "
-
-" + result)
+                                .setMessage("Backend پاسخ موفق نداد.\\n\\nHTTP " + finalStatus + "\\n\\n" + result)
                                 .setPositiveButton("باشه", null)
                                 .show();
                     }
@@ -207,9 +193,7 @@ HTTP " + finalStatus + "
                 final String error = e.getClass().getSimpleName() + ": " + String.valueOf(e.getMessage());
                 runOnUiThread(() -> new AlertDialog.Builder(this)
                         .setTitle("خطای اتصال")
-                        .setMessage("اتصال به AI Director برقرار نشد.
-
-" + error)
+                        .setMessage("اتصال به AI Director برقرار نشد.\\n\\n" + error)
                         .setPositiveButton("باشه", null)
                         .show());
             } finally {
@@ -362,7 +346,7 @@ HTTP " + finalStatus + "
 
             Toast.makeText(this, "AI Director در حال تحلیل درخواست شماست...", Toast.LENGTH_SHORT).show();
             requestDirector(userPrompt);
-        }));
+        });
 
         root.addView(
                 create,
