@@ -1,0 +1,16 @@
+plugins {
+    id 'com.android.application'
+}
+
+android {
+    namespace 'com.mjk.videoai'
+    compileSdk 35
+
+    defaultConfig {
+        applicationId 'com.mjk.videoai'
+        minSdk 24
+        targetSdk 35
+        versionCode 1
+        versionName "1.0"
+    }
+}
