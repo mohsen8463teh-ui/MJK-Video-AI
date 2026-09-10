@@ -3,6 +3,7 @@ from flask import Flask, jsonify, request
 from router import ModelRouter
 from director import AIDirector
 from llm_router import LLMRouter
+from llm_provider import LLMProviderError
 
 
 app = Flask(__name__)
@@ -115,6 +116,65 @@ def llm_director_request():
             "ok": True,
             "request": plan
         })
+
+    except ValueError as exc:
+        return jsonify({
+            "ok": False,
+            "error": str(exc)
+        }), 400
+
+    except Exception as exc:
+        return jsonify({
+            "ok": False,
+            "error": "internal_error",
+            "details": str(exc)
+        }), 500
+
+
+
+@app.post("/v1/llm/director-generate")
+def llm_director_generate():
+    data = request.get_json(silent=True) or {}
+
+    prompt = str(data.get("prompt", "")).strip()
+
+    if len(prompt) < 3:
+        return jsonify({
+            "ok": False,
+            "error": "prompt is required"
+        }), 400
+
+    try:
+        plan = llm_router.generate_director_plan(
+            prompt=prompt,
+            duration_seconds=int(
+                data.get("duration_seconds", 30)
+            ),
+            style=str(
+                data.get("style", "cinematic")
+            ),
+            language=str(
+                data.get("language", "فارسی")
+            ),
+            aspect_ratio=str(
+                data.get("aspect_ratio", "16:9")
+            ),
+            output_type=str(
+                data.get("output_type", "general")
+            )
+        )
+
+        return jsonify({
+            "ok": True,
+            "plan": plan
+        })
+
+    except LLMProviderError as exc:
+        return jsonify({
+            "ok": False,
+            "error": "llm_provider_error",
+            "details": str(exc)
+        }), 502
 
     except ValueError as exc:
         return jsonify({

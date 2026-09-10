@@ -1,5 +1,7 @@
 from typing import Any, Dict, List, Optional
 
+from llm_provider import OpenRouterProvider, LLMProviderError
+
 
 class LLMRouter:
     """
@@ -25,6 +27,15 @@ class LLMRouter:
                 "status": "not_configured",
             }
         }
+
+        self.openrouter = OpenRouterProvider()
+
+        self.register_provider(
+            "openrouter",
+            "OpenRouter",
+            self.openrouter.model,
+            self.openrouter.configured,
+        )
 
     def register_provider(
         self,
@@ -172,6 +183,22 @@ generation.
             )
 
         return normalized
+
+    def generate_director_plan(self, **kwargs) -> Dict[str, Any]:
+        request = self.build_director_request(**kwargs)
+
+        if not self.openrouter.configured:
+            raise LLMProviderError(
+                "No LLM provider is configured"
+            )
+
+        response = self.openrouter.generate_json(
+            system_instruction=request["system_instruction"],
+            user_request=request["user_request"],
+            response_schema=request["response_schema"],
+        )
+
+        return self.normalize_response(response)
 
     def status(self) -> Dict[str, Any]:
         selected = self.select_provider()
