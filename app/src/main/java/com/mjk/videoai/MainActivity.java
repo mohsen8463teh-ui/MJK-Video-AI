@@ -236,23 +236,6 @@ public class MainActivity extends Activity {
                         } catch (Exception e) {
                             new AlertDialog.Builder(this)
                                     .setTitle("AI Director")
-                                    .setMessage("خطا در نمایش پاسخ:\n\n" + e.getMessage()
-                                            + "\n\nپاسخ خام:\n" + result)
-                                    .setPositiveButton("باشه", null)
-                                    .show();
-                        }
-                    } else {
-                        new AlertDialog.Builder(this)
-                                .setTitle("خطا")
-                                .setMessage("Backend پاسخ موفق نداد.\n\nHTTP "
-                                        + finalStatus + "\n\n" + result)
-                                .setPositiveButton("باشه", null)
-                                .show();
-                    }
-                });
-            } catch (Exception e) {
-                            new AlertDialog.Builder(this)
-                                    .setTitle("AI Director")
                                     .setMessage(result)
                                     .setPositiveButton("باشه", null)
                                     .show();
