@@ -1,6 +1,14 @@
 package com.mjk.videoai;
 
 import android.app.Activity;
+import android.app.AlertDialog;
+import org.json.JSONObject;
+import java.io.BufferedReader;
+import java.io.InputStream;
+import java.io.InputStreamReader;
+import java.io.OutputStream;
+import java.net.HttpURLConnection;
+import java.net.URL;
 import android.graphics.Color;
 import android.graphics.Typeface;
 import android.graphics.drawable.GradientDrawable;
@@ -15,6 +23,8 @@ import android.widget.TextView;
 import android.widget.Toast;
 
 public class MainActivity extends Activity {
+
+    private static final String BACKEND_URL = "http://127.0.0.1:5000/v1/llm/director-generate";
 
     private final int BG = Color.rgb(10, 12, 18);
     private final int CARD = Color.rgb(22, 25, 34);
@@ -108,6 +118,104 @@ public class MainActivity extends Activity {
         }
 
         return row;
+    }
+
+    private void requestDirector(String userPrompt) {
+        new Thread(() -> {
+            HttpURLConnection connection = null;
+            try {
+                URL url = new URL(BACKEND_URL);
+                connection = (HttpURLConnection) url.openConnection();
+                connection.setRequestMethod("POST");
+                connection.setConnectTimeout(10000);
+                connection.setReadTimeout(120000);
+                connection.setDoOutput(true);
+                connection.setRequestProperty("Content-Type", "application/json; charset=UTF-8");
+                connection.setRequestProperty("Accept", "application/json");
+
+                JSONObject body = new JSONObject();
+                body.put("prompt", userPrompt);
+                body.put("duration_seconds", 30);
+                body.put("style", "cinematic");
+                body.put("language", "فارسی");
+                body.put("aspect_ratio", "9:16");
+                body.put("output_type", "advertisement");
+
+                OutputStream os = connection.getOutputStream();
+                os.write(body.toString().getBytes("UTF-8"));
+                os.flush();
+                os.close();
+
+                int statusCode = connection.getResponseCode();
+                InputStream stream = (statusCode >= 200 && statusCode < 300)
+                        ? connection.getInputStream() : connection.getErrorStream();
+
+                BufferedReader reader = new BufferedReader(new InputStreamReader(stream, "UTF-8"));
+                StringBuilder response = new StringBuilder();
+                String line;
+                while ((line = reader.readLine()) != null) response.append(line);
+                reader.close();
+
+                final String result = response.toString();
+                final int finalStatus = statusCode;
+
+                runOnUiThread(() -> {
+                    if (finalStatus >= 200 && finalStatus < 300) {
+                        try {
+                            JSONObject json = new JSONObject(result);
+                            StringBuilder display = new StringBuilder();
+                            if (json.has("concept")) display.append("ایده:
+").append(json.optString("concept")).append("
+
+");
+                            if (json.has("hook")) display.append("Hook:
+").append(json.optString("hook")).append("
+
+");
+                            if (json.has("story")) display.append("سناریو:
+").append(json.optString("story")).append("
+
+");
+                            if (json.has("cta")) display.append("CTA:
+").append(json.optString("cta"));
+
+                            new AlertDialog.Builder(this)
+                                    .setTitle("AI Director")
+                                    .setMessage(display.toString())
+                                    .setPositiveButton("باشه", null)
+                                    .show();
+                        } catch (Exception e) {
+                            new AlertDialog.Builder(this)
+                                    .setTitle("AI Director")
+                                    .setMessage(result)
+                                    .setPositiveButton("باشه", null)
+                                    .show();
+                        }
+                    } else {
+                        new AlertDialog.Builder(this)
+                                .setTitle("خطا")
+                                .setMessage("Backend پاسخ موفق نداد.
+
+HTTP " + finalStatus + "
+
+" + result)
+                                .setPositiveButton("باشه", null)
+                                .show();
+                    }
+                });
+            } catch (Exception e) {
+                final String error = e.getClass().getSimpleName() + ": " + String.valueOf(e.getMessage());
+                runOnUiThread(() -> new AlertDialog.Builder(this)
+                        .setTitle("خطای اتصال")
+                        .setMessage("اتصال به AI Director برقرار نشد.
+
+" + error)
+                        .setPositiveButton("باشه", null)
+                        .show());
+            } finally {
+                if (connection != null) connection.disconnect();
+            }
+        }).start();
     }
 
     @Override
@@ -244,20 +352,17 @@ public class MainActivity extends Activity {
         create.setBackground(rounded(ACCENT, 18));
 
         create.setOnClickListener(v -> {
-            if (prompt.getText().toString().trim().isEmpty()) {
-                Toast.makeText(
-                        this,
-                        "اول ایده یا پرامپتت را وارد کن.",
-                        Toast.LENGTH_SHORT).show();
+            String userPrompt = prompt.getText().toString().trim();
+
+            if (userPrompt.isEmpty()) {
+                Toast.makeText(this, "لطفاً ابتدا توضیح ویدیو را وارد کنید.", Toast.LENGTH_SHORT).show();
                 prompt.requestFocus();
                 return;
             }
 
-            Toast.makeText(
-                    this,
-                    "ایده دریافت شد؛ مرحله بعد موتور AI را متصل می‌کنیم.",
-                    Toast.LENGTH_LONG).show();
-        });
+            Toast.makeText(this, "AI Director در حال تحلیل درخواست شماست...", Toast.LENGTH_SHORT).show();
+            requestDirector(userPrompt);
+        }));
 
         root.addView(
                 create,
