@@ -163,11 +163,61 @@ public class MainActivity extends Activity {
                     if (finalStatus >= 200 && finalStatus < 300) {
                         try {
                             JSONObject json = new JSONObject(result);
+                            JSONObject plan = json.optJSONObject("plan");
+                            if (plan == null) {
+                                plan = json;
+                            }
+
                             StringBuilder display = new StringBuilder();
-                            if (json.has("concept")) display.append("ایده:\\n").append(json.optString("concept")).append("\\n\\n");
-                            if (json.has("hook")) display.append("Hook:\\n").append(json.optString("hook")).append("\\n\\n");
-                            if (json.has("story")) display.append("سناریو:\\n").append(json.optString("story")).append("\\n\\n");
-                            if (json.has("cta")) display.append("CTA:\\n").append(json.optString("cta"));
+
+                            if (plan.has("concept")) {
+                                display.append("ایده:
+")
+                                        .append(plan.optString("concept"))
+                                        .append("
+
+");
+                            }
+
+                            if (plan.has("hook")) {
+                                display.append("Hook:
+")
+                                        .append(plan.optString("hook"))
+                                        .append("
+
+");
+                            }
+
+                            if (plan.has("audience")) {
+                                display.append("مخاطب:
+")
+                                        .append(plan.optString("audience"))
+                                        .append("
+
+");
+                            }
+
+                            if (plan.has("story")) {
+                                display.append("سناریو:
+")
+                                        .append(plan.optString("story"))
+                                        .append("
+
+");
+                            }
+
+                            if (plan.has("cta")) {
+                                display.append("CTA:
+")
+                                        .append(plan.optString("cta"));
+                            }
+
+                            if (display.length() == 0) {
+                                display.append("پاسخ AI دریافت شد، اما محتوای قابل نمایش پیدا نشد.
+
+")
+                                        .append(result);
+                            }
 
                             new AlertDialog.Builder(this)
                                     .setTitle("AI Director")

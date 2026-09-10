@@ -137,14 +137,25 @@ class OpenRouterProvider:
 
         try:
             result = json.loads(content)
-        except json.JSONDecodeError as exc:
-            raise LLMProviderError(
-                "provider returned non-JSON content"
-            ) from exc
+            if isinstance(result, dict):
+                return result
+        except json.JSONDecodeError:
+            pass
 
-        if not isinstance(result, dict):
-            raise LLMProviderError(
-                "provider JSON root must be an object"
-            )
+        decoder = json.JSONDecoder()
 
-        return result
+        for index, char in enumerate(content):
+            if char != "{":
+                continue
+
+            try:
+                result, _ = decoder.raw_decode(content[index:])
+            except json.JSONDecodeError:
+                continue
+
+            if isinstance(result, dict):
+                return result
+
+        raise LLMProviderError(
+            "provider returned non-JSON content"
+        )
