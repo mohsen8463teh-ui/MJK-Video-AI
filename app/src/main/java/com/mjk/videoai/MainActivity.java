@@ -171,51 +171,36 @@ public class MainActivity extends Activity {
                             StringBuilder display = new StringBuilder();
 
                             if (plan.has("concept")) {
-                                display.append("ایده:
-")
+                                display.append("ایده:\n")
                                         .append(plan.optString("concept"))
-                                        .append("
-
-");
+                                        .append("\n\n");
                             }
 
                             if (plan.has("hook")) {
-                                display.append("Hook:
-")
+                                display.append("Hook:\n")
                                         .append(plan.optString("hook"))
-                                        .append("
-
-");
+                                        .append("\n\n");
                             }
 
                             if (plan.has("audience")) {
-                                display.append("مخاطب:
-")
+                                display.append("مخاطب:\n")
                                         .append(plan.optString("audience"))
-                                        .append("
-
-");
+                                        .append("\n\n");
                             }
 
                             if (plan.has("story")) {
-                                display.append("سناریو:
-")
+                                display.append("سناریو:\n")
                                         .append(plan.optString("story"))
-                                        .append("
-
-");
+                                        .append("\n\n");
                             }
 
                             if (plan.has("cta")) {
-                                display.append("CTA:
-")
+                                display.append("CTA:\n")
                                         .append(plan.optString("cta"));
                             }
 
                             if (display.length() == 0) {
-                                display.append("پاسخ AI دریافت شد، اما محتوای قابل نمایش پیدا نشد.
-
-")
+                                display.append("پاسخ AI دریافت شد، اما محتوای قابل نمایش پیدا نشد.\n\n")
                                         .append(result);
                             }
 
