@@ -1,0 +1,79 @@
+name: Test KIE Video API
+
+on:
+  workflow_dispatch:
+
+jobs:
+  test-kie:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install requests
+        run: python -m pip install requests
+
+      - name: Generate 5 second KIE test clip
+        env:
+          KIE_API_KEY4: ${{ secrets.KIE_API_KEY4 }}
+        run: |
+          python - <<'PY'
+          import os, time, json, sys
+          import requests
+
+          key = os.environ.get("KIE_API_KEY4")
+          if not key:
+              print("ERROR: GitHub secret KIE_API_KEY4 is missing.")
+              sys.exit(1)
+
+          headers = {"Authorization": f"Bearer {key}", "Content-Type": "application/json"}
+          payload = {
+              "model": "bytedance/v1-pro-text-to-video",
+              "input": {
+                  "prompt": "A cinematic close-up of a small glowing blue cube on a dark studio table, subtle camera movement, realistic lighting",
+                  "aspect_ratio": "16:9",
+                  "resolution": "480p",
+                  "duration": "5",
+                  "camera_fixed": False,
+                  "seed": -1,
+                  "enable_safety_checker": True,
+                  "nsfw_checker": False
+              }
+          }
+          r = requests.post("https://api.kie.ai/api/v1/jobs/createTask", headers=headers, json=payload, timeout=60)
+          print("createTask HTTP:", r.status_code)
+          print(r.text[:2000])
+          r.raise_for_status()
+          data = r.json()
+          task_id = (data.get("data") or {}).get("taskId")
+          if not task_id:
+              print("ERROR: No taskId returned")
+              sys.exit(1)
+          print("KIE task created successfully. taskId received (hidden).")
+
+          for i in range(36):
+              time.sleep(5)
+              s = requests.get("https://api.kie.ai/api/v1/jobs/recordInfo", headers={"Authorization": f"Bearer {key}"}, params={"taskId": task_id}, timeout=30)
+              print("poll", i+1, "HTTP:", s.status_code)
+              s.raise_for_status()
+              body = s.json()
+              info = body.get("data") or {}
+              state = info.get("state")
+              print("state:", state)
+              if state == "success":
+                  result_json = info.get("resultJson")
+                  print("SUCCESS: KIE generated the test clip.")
+                  print("resultJson:", str(result_json)[:2000])
+                  sys.exit(0)
+              if state == "fail":
+                  print("KIE generation failed:", str(info)[:3000])
+                  sys.exit(1)
+
+          print("ERROR: Timed out waiting for KIE.")
+          sys.exit(1)
+          PY
