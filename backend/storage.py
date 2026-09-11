@@ -16,7 +16,7 @@ PROJECTS_ROOT = STORAGE_ROOT / "projects"
 
 
 class Storage:
-    """Persistent local project metadata + file storage foundation."""
+    """Persistent project metadata and project-local file storage."""
 
     def __init__(self) -> None:
         STORAGE_ROOT.mkdir(parents=True, exist_ok=True)
@@ -193,6 +193,8 @@ class Storage:
 
         if result["status"] == "awaiting_video_provider":
             result["next_stage"] = "video_generation"
+        elif result["status"] == "awaiting_assembly":
+            result["next_stage"] = "assembly"
         elif result["status"] == "completed":
             result["next_stage"] = "download"
         elif result["status"] == "failed":
@@ -209,11 +211,22 @@ class Storage:
         value: Dict[str, Any],
         kind: str,
     ) -> Dict[str, Any]:
-        path = self._safe_project_path(project_id, relative_path)
-        path.parent.mkdir(parents=True, exist_ok=True)
         payload = json.dumps(
             value, ensure_ascii=False, indent=2
         ).encode("utf-8")
+        return self.write_bytes(
+            project_id, relative_path, payload, kind
+        )
+
+    def write_bytes(
+        self,
+        project_id: str,
+        relative_path: str,
+        payload: bytes,
+        kind: str,
+    ) -> Dict[str, Any]:
+        path = self._safe_project_path(project_id, relative_path)
+        path.parent.mkdir(parents=True, exist_ok=True)
         path.write_bytes(payload)
         return self._register_file(
             project_id, relative_path, kind, len(payload)
@@ -229,6 +242,13 @@ class Storage:
             raise ValueError("invalid_storage_path")
 
         return path
+
+    def project_file_path(
+        self,
+        project_id: str,
+        relative_path: str,
+    ) -> Path:
+        return self._safe_project_path(project_id, relative_path)
 
     def _register_file(
         self,

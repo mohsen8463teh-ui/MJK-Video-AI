@@ -6,6 +6,7 @@ from llm_router import LLMRouter
 from llm_provider import LLMProviderError
 from storage import Storage
 from jobs import JobManager
+from video_provider import VideoRouter, VideoProviderError
 
 
 app = Flask(__name__)
@@ -14,7 +15,8 @@ router = ModelRouter()
 director = AIDirector()
 llm_router = LLMRouter()
 storage = Storage()
-jobs = JobManager(storage, llm_router)
+video_router = VideoRouter()
+jobs = JobManager(storage, llm_router, video_router)
 
 
 @app.get("/health")
@@ -22,10 +24,11 @@ def health():
     return jsonify({
         "ok": True,
         "service": "MJK Video AI Backend",
-        "version": "0.3.0",
+        "version": "0.4.0",
         "router": True,
         "storage": True,
-        "jobs": True
+        "jobs": True,
+        "video_router": True,
     })
 
 
@@ -37,29 +40,28 @@ def models():
     })
 
 
+@app.get("/v1/video/status")
+def video_status():
+    return jsonify({
+        "ok": True,
+        "status": video_router.status(),
+    })
+
+
 @app.post("/v1/director/create")
 def create_director_plan():
     data = request.get_json(silent=True) or {}
 
     try:
         plan = director.create(data)
-
-        return jsonify({
-            "ok": True,
-            "plan": plan
-        })
-
+        return jsonify({"ok": True, "plan": plan})
     except ValueError as exc:
-        return jsonify({
-            "ok": False,
-            "error": str(exc)
-        }), 400
-
+        return jsonify({"ok": False, "error": str(exc)}), 400
     except Exception as exc:
         return jsonify({
             "ok": False,
             "error": "internal_error",
-            "details": str(exc)
+            "details": str(exc),
         }), 500
 
 
@@ -69,23 +71,14 @@ def create_plan():
 
     try:
         plan = router.create_plan(data)
-
-        return jsonify({
-            "ok": True,
-            "plan": plan
-        })
-
+        return jsonify({"ok": True, "plan": plan})
     except ValueError as exc:
-        return jsonify({
-            "ok": False,
-            "error": str(exc)
-        }), 400
-
+        return jsonify({"ok": False, "error": str(exc)}), 400
     except Exception as exc:
         return jsonify({
             "ok": False,
             "error": "internal_error",
-            "details": str(exc)
+            "details": str(exc),
         }), 500
 
 
@@ -97,7 +90,7 @@ def create_project_job():
     if len(prompt) < 3:
         return jsonify({
             "ok": False,
-            "error": "prompt is required"
+            "error": "prompt is required",
         }), 400
 
     try:
@@ -124,20 +117,62 @@ def create_project_job():
 
         return jsonify({
             "ok": True,
-            "project": project
+            "project": project,
         }), 202
 
     except ValueError as exc:
         return jsonify({
             "ok": False,
-            "error": str(exc)
+            "error": str(exc),
         }), 400
-
     except Exception as exc:
         return jsonify({
             "ok": False,
             "error": "internal_error",
-            "details": str(exc)
+            "details": str(exc),
+        }), 500
+
+
+@app.post("/v1/projects/<project_id>/generate-video")
+def generate_project_video(project_id):
+    data = request.get_json(silent=True) or {}
+
+    try:
+        project = storage.get_project(project_id)
+    except KeyError:
+        return jsonify({
+            "ok": False,
+            "error": "project_not_found",
+        }), 404
+
+    if not project.get("plan"):
+        return jsonify({
+            "ok": False,
+            "error": "director_plan_not_ready",
+        }), 409
+
+    try:
+        project = jobs.submit_video_job(
+            project_id,
+            preferred_provider=data.get("provider"),
+        )
+
+        return jsonify({
+            "ok": True,
+            "project": project,
+        }), 202
+
+    except VideoProviderError as exc:
+        return jsonify({
+            "ok": False,
+            "error": "video_provider_error",
+            "details": str(exc),
+        }), 503
+    except Exception as exc:
+        return jsonify({
+            "ok": False,
+            "error": "internal_error",
+            "details": str(exc),
         }), 500
 
 
@@ -146,12 +181,12 @@ def get_project(project_id):
     try:
         return jsonify({
             "ok": True,
-            "project": storage.get_project(project_id)
+            "project": storage.get_project(project_id),
         })
     except KeyError:
         return jsonify({
             "ok": False,
-            "error": "project_not_found"
+            "error": "project_not_found",
         }), 404
 
 
@@ -161,12 +196,12 @@ def get_project_files(project_id):
         storage.get_project(project_id)
         return jsonify({
             "ok": True,
-            "files": storage.list_files(project_id)
+            "files": storage.list_files(project_id),
         })
     except KeyError:
         return jsonify({
             "ok": False,
-            "error": "project_not_found"
+            "error": "project_not_found",
         }), 404
 
 
@@ -174,7 +209,7 @@ def get_project_files(project_id):
 def llm_status():
     return jsonify({
         "ok": True,
-        "status": llm_router.status()
+        "status": llm_router.status(),
     })
 
 
@@ -186,48 +221,55 @@ def llm_director_request():
     if len(prompt) < 3:
         return jsonify({
             "ok": False,
-            "error": "prompt is required"
+            "error": "prompt is required",
         }), 400
 
     try:
         plan = llm_router.build_director_request(
             prompt=prompt,
-            duration_seconds=int(data.get("duration_seconds", 30)),
-            style=str(data.get("style", "cinematic")),
-            language=str(data.get("language", "فارسی")),
-            aspect_ratio=str(data.get("aspect_ratio", "16:9")),
-            output_type=str(data.get("output_type", "general"))
+            duration_seconds=int(
+                data.get("duration_seconds", 30)
+            ),
+            style=str(
+                data.get("style", "cinematic")
+            ),
+            language=str(
+                data.get("language", "فارسی")
+            ),
+            aspect_ratio=str(
+                data.get("aspect_ratio", "16:9")
+            ),
+            output_type=str(
+                data.get("output_type", "general")
+            ),
         )
 
         return jsonify({
             "ok": True,
-            "request": plan
+            "request": plan,
         })
-
     except ValueError as exc:
         return jsonify({
             "ok": False,
-            "error": str(exc)
+            "error": str(exc),
         }), 400
-
     except Exception as exc:
         return jsonify({
             "ok": False,
             "error": "internal_error",
-            "details": str(exc)
+            "details": str(exc),
         }), 500
 
 
 @app.post("/v1/llm/director-generate")
 def llm_director_generate():
     data = request.get_json(silent=True) or {}
-
     prompt = str(data.get("prompt", "")).strip()
 
     if len(prompt) < 3:
         return jsonify({
             "ok": False,
-            "error": "prompt is required"
+            "error": "prompt is required",
         }), 400
 
     try:
@@ -247,32 +289,29 @@ def llm_director_generate():
             ),
             output_type=str(
                 data.get("output_type", "general")
-            )
+            ),
         )
 
         return jsonify({
             "ok": True,
-            "plan": plan
+            "plan": plan,
         })
-
     except LLMProviderError as exc:
         return jsonify({
             "ok": False,
             "error": "llm_provider_error",
-            "details": str(exc)
+            "details": str(exc),
         }), 502
-
     except ValueError as exc:
         return jsonify({
             "ok": False,
-            "error": str(exc)
+            "error": str(exc),
         }), 400
-
     except Exception as exc:
         return jsonify({
             "ok": False,
             "error": "internal_error",
-            "details": str(exc)
+            "details": str(exc),
         }), 500
 
 
@@ -280,5 +319,5 @@ if __name__ == "__main__":
     app.run(
         host="127.0.0.1",
         port=5000,
-        debug=False
+        debug=False,
     )
