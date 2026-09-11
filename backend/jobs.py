@@ -9,6 +9,9 @@ from scene_planner import build_generation_shots
 from timeline import build_media_timeline
 from audio_plan import build_voice_plan
 from captions import build_caption_plan
+from audio_provider import AudioRouter
+from audio_renderer import AudioRenderError, render_voice_plan
+from caption_renderer import CaptionRenderError, write_srt
 
 
 class JobManager:
@@ -19,10 +22,17 @@ class JobManager:
     the HTTP API.
     """
 
-    def __init__(self, storage, llm_router, video_router) -> None:
+    def __init__(
+        self,
+        storage,
+        llm_router,
+        video_router,
+        audio_router=None,
+    ) -> None:
         self.storage = storage
         self.llm_router = llm_router
         self.video_router = video_router
+        self.audio_router = audio_router or AudioRouter()
         self.executor = ThreadPoolExecutor(
             max_workers=2,
             thread_name_prefix="mjk-job",
@@ -255,6 +265,65 @@ class JobManager:
                 "caption_plan",
             )
 
+            audio_provider = self.audio_router.select(
+                language=project["language"],
+            )
+            pending_voice = any(
+                item.get("status") == "pending"
+                for item in voice_plan.get("segments", [])
+            )
+
+            if audio_provider is not None and pending_voice:
+                try:
+                    voice_plan = render_voice_plan(
+                        voice_plan=voice_plan,
+                        provider=audio_provider,
+                        output_dir=self.storage.project_file_path(
+                            project_id, "audio/voice"
+                        ),
+                    )
+                except AudioRenderError as exc:
+                    self.storage.update_project(
+                        project_id, status="failed", error=str(exc)
+                    )
+                    return
+            elif pending_voice:
+                voice_plan["status"] = "provider_unavailable"
+
+            self.storage.write_json(
+                project_id,
+                "audio/voice_plan.json",
+                voice_plan,
+                "voice_plan",
+            )
+
+            subtitle_path = None
+            if caption_plan.get("cues"):
+                subtitle_path = self.storage.project_file_path(
+                    project_id, "captions/captions.srt"
+                )
+                try:
+                    size = write_srt(
+                        caption_plan=caption_plan,
+                        output_path=subtitle_path,
+                    )
+                except CaptionRenderError as exc:
+                    self.storage.update_project(
+                        project_id, status="failed", error=str(exc)
+                    )
+                    return
+                self.storage._register_file(
+                    project_id, "captions/captions.srt", "subtitle", size
+                )
+                caption_plan["status"] = "ready"
+                caption_plan["relative_path"] = "captions/captions.srt"
+                self.storage.write_json(
+                    project_id,
+                    "captions/caption_plan.json",
+                    caption_plan,
+                    "caption_plan",
+                )
+
             self.storage.update_project(project_id, status="assembling")
 
             scene_paths = [
@@ -267,7 +336,17 @@ class JobManager:
             final_path = self.storage.project_file_path(
                 project_id, final_relative_path
             )
-            final_size = assemble_videos(scene_paths, final_path)
+            ready_voice_segments = [
+                item for item in voice_plan.get("segments", [])
+                if item.get("status") == "ready"
+            ]
+            final_size = assemble_videos(
+                scene_paths,
+                final_path,
+                voice_segments=ready_voice_segments,
+                duration_seconds=project["duration_seconds"],
+                subtitle_path=subtitle_path,
+            )
 
             final_file = self.storage._register_file(
                 project_id, final_relative_path, "final_video", final_size

@@ -7,6 +7,7 @@ from llm_provider import LLMProviderError
 from storage import Storage
 from jobs import JobManager
 from video_provider import VideoRouter, VideoProviderError
+from audio_provider import AudioRouter
 
 
 app = Flask(__name__)
@@ -16,7 +17,13 @@ director = AIDirector()
 llm_router = LLMRouter()
 storage = Storage()
 video_router = VideoRouter()
-jobs = JobManager(storage, llm_router, video_router)
+audio_router = AudioRouter()
+jobs = JobManager(
+    storage,
+    llm_router,
+    video_router,
+    audio_router,
+)
 
 
 @app.get("/health")
@@ -29,6 +36,7 @@ def health():
         "storage": True,
         "jobs": True,
         "video_router": True,
+        "audio_router": True,
     })
 
 
@@ -45,6 +53,14 @@ def video_status():
     return jsonify({
         "ok": True,
         "status": video_router.status(),
+    })
+
+
+@app.get("/v1/audio/status")
+def audio_status():
+    return jsonify({
+        "ok": True,
+        "status": audio_router.status(),
     })
 
 

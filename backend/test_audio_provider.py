@@ -2,7 +2,9 @@ from pathlib import Path
 
 import pytest
 
-from audio_provider import AudioProviderError, AudioRouter, KokoroHTTPProvider
+from audio_provider import (
+    AudioProviderError, AudioRouter, KokoroHTTPProvider, PiperProvider
+)
 from audio_renderer import AudioRenderError, render_voice_plan
 
 
@@ -115,3 +117,33 @@ def test_renderer_does_not_call_network(tmp_path):
         output_dir=tmp_path,
     )
     assert provider.calls
+
+def test_piper_requires_configured_model():
+    provider = PiperProvider(model_fa="", model_en="")
+    assert provider.configured() is False
+    with pytest.raises(AudioProviderError, match="piper_model_not_configured"):
+        provider.generate(
+            text="سلام",
+            output_path=Path("/tmp/mjk-piper-test.wav"),
+            language="فارسی",
+        )
+
+
+def test_piper_command_uses_documented_cli_shape(tmp_path):
+    provider = PiperProvider(
+        model_fa="fa_IR-amir-medium",
+        model_en="en_US-lessac-medium",
+        data_dir="/opt/piper/voices",
+    )
+    command = provider._command(
+        text="سلام دنیا",
+        output_path=tmp_path / "voice.wav",
+        language="فارسی",
+    )
+    assert command[:6] == [
+        "python3", "-m", "piper", "-m",
+        "fa_IR-amir-medium", "-f",
+    ]
+    assert command[-3:] == [
+        "/opt/piper/voices", "--", "سلام دنیا"
+    ]
