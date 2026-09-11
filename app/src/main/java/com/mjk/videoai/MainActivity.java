@@ -34,6 +34,12 @@ public class MainActivity extends Activity {
     private final int ACCENT = Color.rgb(118, 86, 255);
     private final int SELECTED = Color.rgb(74, 52, 170);
 
+    private String selectedOutputType = "youtube";
+    private String selectedStyle = "cinematic";
+    private int selectedDurationSeconds = 60;
+    private String selectedLanguage = "فارسی";
+    private String selectedAspectRatio = "9:16";
+
     private int dp(float v) {
         return (int)(v * getResources().getDisplayMetrics().density + 0.5f);
     }
