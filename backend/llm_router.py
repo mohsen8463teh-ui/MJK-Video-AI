@@ -96,19 +96,27 @@ You must reason about:
 
 1. Audience
 2. Objective
-3. Hook
-4. Story structure
-5. Scene continuity
-6. Characters
-7. Locations
-8. Camera language
-9. Lighting
-10. Visual style
-11. Voice-over
-12. Music
-13. Sound effects
-14. Captions
-15. Call to action when appropriate
+3. Platform strategy (YouTube, Shorts/Reels, Instagram, or general)
+4. Hook in the first seconds
+5. Retention strategy and curiosity loops
+6. Story structure
+7. Scene continuity
+8. Characters and character consistency
+9. Locations and visual continuity
+10. Camera language
+11. Lighting
+12. Visual style
+13. Voice-over
+14. Music
+15. Sound effects
+16. Captions
+17. Call to action when appropriate
+18. YouTube title candidates
+19. Thumbnail concept and thumbnail text
+20. Description
+21. Chapters for long-form content
+22. Search/discovery keywords
+23. Originality and non-repetitive content safeguards
 
 Never invent facts about a real product unless the user
 provided them.
@@ -137,6 +145,9 @@ generation.
                     "concept",
                     "hook",
                     "audience",
+                    "objective",
+                    "platform_strategy",
+                    "retention_strategy",
                     "story",
                     "characters",
                     "locations",
@@ -146,6 +157,11 @@ generation.
                     "sound_effects",
                     "captions",
                     "cta",
+                    "youtube_titles",
+                    "thumbnail",
+                    "description",
+                    "chapters",
+                    "keywords",
                 ],
             },
         }
@@ -159,6 +175,9 @@ generation.
             "concept",
             "hook",
             "audience",
+            "objective",
+            "platform_strategy",
+            "retention_strategy",
             "story",
             "characters",
             "locations",
@@ -168,6 +187,11 @@ generation.
             "sound_effects",
             "captions",
             "cta",
+            "youtube_titles",
+            "thumbnail",
+            "description",
+            "chapters",
+            "keywords",
         ]
 
         normalized = {}
