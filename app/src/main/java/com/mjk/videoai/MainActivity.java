@@ -144,11 +144,11 @@ public class MainActivity extends Activity {
 
                 JSONObject body = new JSONObject();
                 body.put("prompt", userPrompt);
-                body.put("duration_seconds", 30);
-                body.put("style", "cinematic");
-                body.put("language", "فارسی");
-                body.put("aspect_ratio", "9:16");
-                body.put("output_type", "advertisement");
+                body.put("duration_seconds", selectedDurationSeconds);
+                body.put("style", selectedStyle);
+                body.put("language", selectedLanguage);
+                body.put("aspect_ratio", selectedAspectRatio);
+                body.put("output_type", selectedOutputType);
 
                 OutputStream os = connection.getOutputStream();
                 os.write(body.toString().getBytes("UTF-8"));
@@ -243,7 +243,7 @@ public class MainActivity extends Activity {
                     } else {
                         new AlertDialog.Builder(this)
                                 .setTitle("خطا")
-                                .setMessage("Backend پاسخ موفق نداد.\\n\\nHTTP " + finalStatus + "\\n\\n" + result)
+                                .setMessage("Backend پاسخ موفق نداد.\n\nHTTP " + finalStatus + "\n\n" + result)
                                 .setPositiveButton("باشه", null)
                                 .show();
                     }
@@ -252,7 +252,7 @@ public class MainActivity extends Activity {
                 final String error = e.getClass().getSimpleName() + ": " + String.valueOf(e.getMessage());
                 runOnUiThread(() -> new AlertDialog.Builder(this)
                         .setTitle("خطای اتصال")
-                        .setMessage("اتصال به AI Director برقرار نشد.\\n\\n" + error)
+                        .setMessage("اتصال به AI Director برقرار نشد.\n\n" + error)
                         .setPositiveButton("باشه", null)
                         .show());
             } finally {
