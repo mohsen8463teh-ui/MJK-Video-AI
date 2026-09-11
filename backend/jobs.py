@@ -5,6 +5,7 @@ from typing import Any, Dict
 from llm_provider import LLMProviderError
 from video_provider import VideoProviderError
 from assembly import AssemblyError, assemble_videos
+from scene_planner import build_generation_shots
 
 
 class JobManager:
@@ -143,58 +144,75 @@ class JobManager:
                 status="video_generating",
             )
 
+
+            max_clip_duration = int(
+                getattr(provider, "max_clip_duration_seconds", 5)
+            )
+            shots = build_generation_shots(
+                plan,
+                project["duration_seconds"],
+                max_clip_duration,
+            )
+
             manifest = {
                 "provider": provider.provider_id,
                 "model": getattr(provider, "model", None),
+                "requested_duration_seconds": project["duration_seconds"],
+                "max_provider_clip_duration_seconds": max_clip_duration,
+                "shot_count": len(shots),
                 "scenes": [],
+                "shots": [],
             }
 
-            for index, scene in enumerate(scenes, start=1):
-                prompt = self._scene_prompt(scene)
+            for shot in shots:
+                prompt = shot["prompt"]
                 if not prompt:
                     raise VideoProviderError(
-                        f"Scene {index} has no usable prompt"
+                        f"Scene {shot['scene_index']} has no usable prompt"
                     )
 
-                duration = self._scene_duration(
-                    scene,
-                    project["duration_seconds"],
-                    len(scenes),
-                )
-
+                duration = int(shot["duration_seconds"])
                 result = provider.generate_text_to_video(
                     prompt=prompt,
                     duration_seconds=duration,
                     aspect_ratio=project["aspect_ratio"],
                 )
 
-                relative_path = f"scenes/scene_{index:03d}.mp4"
+                relative_path = f"scenes/shot_{shot['shot_index']:04d}.mp4"
                 destination = self.storage.project_file_path(
-                    project_id,
-                    relative_path,
+                    project_id, relative_path
                 )
                 size = provider.download_output(
-                    result["output_url"],
-                    destination,
+                    result["output_url"], destination
                 )
-
                 file_info = self.storage._register_file(
-                    project_id,
-                    relative_path,
-                    "video_scene",
-                    size,
+                    project_id, relative_path, "video_shot", size
                 )
 
-                manifest["scenes"].append({
-                    "index": index,
-                    "duration_seconds": duration,
-                    "prompt": prompt,
+                manifest["shots"].append({
+                    **shot,
+                    "file": file_info,
                     "provider_result": {
                         key: value
                         for key, value in result.items()
                         if key != "output_url"
                     },
-                    "file": file_info,
+                })
+
+            for scene_index in range(1, len(plan.get("scenes") or []) + 1):
+                scene_shots = [
+                    item for item in manifest["shots"]
+                    if item["scene_index"] == scene_index
+                ]
+                manifest["scenes"].append({
+                    "index": scene_index,
+                    "shot_count": len(scene_shots),
+                    "shot_indices": [
+                        item["shot_index"] for item in scene_shots
+                    ],
+                    "duration_seconds": sum(
+                        item["duration_seconds"] for item in scene_shots
+                    ),
                 })
 
             self.storage.write_json(
@@ -210,7 +228,7 @@ class JobManager:
                 self.storage.project_file_path(
                     project_id, item["file"]["relative_path"]
                 )
-                for item in manifest["scenes"]
+                for item in manifest["shots"]
             ]
             final_relative_path = "final/final.mp4"
             final_path = self.storage.project_file_path(

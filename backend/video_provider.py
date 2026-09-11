@@ -35,6 +35,7 @@ class VideoProvider(ABC):
 
 class KIEProvider(VideoProvider):
     provider_id = "kie"
+    max_clip_duration_seconds = 5
 
     def __init__(self):
         self.api_key = os.environ.get("KIE_API_KEY4", "").strip()
@@ -74,7 +75,7 @@ class KIEProvider(VideoProvider):
         return result
 
     def generate_text_to_video(self, prompt, duration_seconds, aspect_ratio):
-        payload={"model":self.model,"input":{"prompt":prompt,"aspect_ratio":self._ratio(aspect_ratio),"resolution":self.resolution,"duration":"5","camera_fixed":False,"seed":-1,"enable_safety_checker":True,"nsfw_checker":False}}
+        payload={"model":self.model,"input":{"prompt":prompt,"aspect_ratio":self._ratio(aspect_ratio),"resolution":self.resolution,"duration":str(min(int(duration_seconds), self.max_clip_duration_seconds)),"camera_fixed":False,"seed":-1,"enable_safety_checker":True,"nsfw_checker":False}}
         created=self._request("POST","/api/v1/jobs/createTask",payload)
         task_id=(created.get("data") or {}).get("taskId")
         if not task_id: raise VideoProviderError("KIE did not return a task id")
@@ -87,7 +88,7 @@ class KIEProvider(VideoProvider):
                 except (TypeError,json.JSONDecodeError) as e: raise VideoProviderError("KIE returned invalid resultJson") from e
                 urls=result.get("resultUrls") or result.get("urls") or []
                 if not urls: raise VideoProviderError("KIE task succeeded without a result URL")
-                return {"provider":"kie","model":self.model,"task_id":task_id,"status":state,"output_url":urls[0],"requested_duration_seconds":5,"ratio":self._ratio(aspect_ratio),"resolution":self.resolution}
+                return {"provider":"kie","model":self.model,"task_id":task_id,"status":state,"output_url":urls[0],"requested_duration_seconds":min(int(duration_seconds), self.max_clip_duration_seconds),"ratio":self._ratio(aspect_ratio),"resolution":self.resolution}
             if state=="fail": raise VideoProviderError(f"KIE task failed: {data.get('failMsg') or data.get('failCode') or data}")
             time.sleep(3)
         raise VideoProviderError(f"KIE task timed out: {task_id}")
@@ -102,6 +103,7 @@ class KIEProvider(VideoProvider):
 
 class RunwayProvider(VideoProvider):
     provider_id = "runway"
+    max_clip_duration_seconds = 10
 
     def __init__(self) -> None:
         self.api_key = os.environ.get("RUNWAYML_API_SECRET", "").strip()
