@@ -7,6 +7,7 @@ A local Kokoro-compatible HTTP service can be used for zero per-minute API cost.
 from __future__ import annotations
 
 import os
+import subprocess
 import urllib.error
 import urllib.request
 from pathlib import Path
