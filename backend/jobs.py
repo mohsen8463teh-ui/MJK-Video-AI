@@ -6,6 +6,7 @@ from llm_provider import LLMProviderError
 from video_provider import VideoProviderError
 from assembly import AssemblyError, assemble_videos
 from scene_planner import build_generation_shots
+from timeline import build_media_timeline
 
 
 class JobManager:
@@ -220,6 +221,16 @@ class JobManager:
                 "scenes/manifest.json",
                 manifest,
                 "video_scene_manifest",
+            )
+            timeline = build_media_timeline(
+                project_duration_seconds=project["duration_seconds"],
+                shots=manifest["shots"],
+            )
+            self.storage.write_json(
+                project_id,
+                "scenes/timeline.json",
+                timeline,
+                "media_timeline",
             )
 
             self.storage.update_project(project_id, status="assembling")
