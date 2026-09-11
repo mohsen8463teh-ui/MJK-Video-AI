@@ -7,6 +7,8 @@ from video_provider import VideoProviderError
 from assembly import AssemblyError, assemble_videos
 from scene_planner import build_generation_shots
 from timeline import build_media_timeline
+from audio_plan import build_voice_plan
+from captions import build_caption_plan
 
 
 class JobManager:
@@ -231,6 +233,26 @@ class JobManager:
                 "scenes/timeline.json",
                 timeline,
                 "media_timeline",
+            )
+            voice_plan = build_voice_plan(
+                timeline=timeline,
+                director_plan=plan,
+                language=project["language"],
+            )
+            self.storage.write_json(
+                project_id,
+                "audio/voice_plan.json",
+                voice_plan,
+                "voice_plan",
+            )
+            caption_plan = build_caption_plan(
+                voice_plan=voice_plan,
+            )
+            self.storage.write_json(
+                project_id,
+                "captions/caption_plan.json",
+                caption_plan,
+                "caption_plan",
             )
 
             self.storage.update_project(project_id, status="assembling")
