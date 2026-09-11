@@ -4,6 +4,7 @@ from typing import Any, Dict
 
 from llm_provider import LLMProviderError
 from video_provider import VideoProviderError
+from assembly import AssemblyError, assemble_videos
 
 
 class JobManager:
@@ -203,12 +204,35 @@ class JobManager:
                 "video_scene_manifest",
             )
 
-            self.storage.update_project(
-                project_id,
-                status="awaiting_assembly",
-            )
+            self.storage.update_project(project_id, status="assembling")
 
-        except (VideoProviderError, KeyError, ValueError) as exc:
+            scene_paths = [
+                self.storage.project_file_path(
+                    project_id, item["file"]["relative_path"]
+                )
+                for item in manifest["scenes"]
+            ]
+            final_relative_path = "final/final.mp4"
+            final_path = self.storage.project_file_path(
+                project_id, final_relative_path
+            )
+            final_size = assemble_videos(scene_paths, final_path)
+
+            final_file = self.storage._register_file(
+                project_id, final_relative_path, "final_video", final_size
+            )
+            manifest["final"] = {
+                "relative_path": final_relative_path,
+                "size_bytes": final_size,
+                "file": final_file,
+            }
+            self.storage.write_json(
+                project_id, "scenes/manifest.json", manifest,
+                "video_scene_manifest"
+            )
+            self.storage.update_project(project_id, status="completed")
+
+        except (VideoProviderError, AssemblyError, KeyError, ValueError) as exc:
             self.storage.update_project(
                 project_id,
                 status="failed",
