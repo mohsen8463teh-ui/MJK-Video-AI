@@ -4,6 +4,8 @@ from router import ModelRouter
 from director import AIDirector
 from llm_router import LLMRouter
 from llm_provider import LLMProviderError
+from storage import Storage
+from jobs import JobManager
 
 
 app = Flask(__name__)
@@ -11,6 +13,8 @@ app = Flask(__name__)
 router = ModelRouter()
 director = AIDirector()
 llm_router = LLMRouter()
+storage = Storage()
+jobs = JobManager(storage, llm_router)
 
 
 @app.get("/health")
@@ -18,8 +22,10 @@ def health():
     return jsonify({
         "ok": True,
         "service": "MJK Video AI Backend",
-        "version": "0.2.0",
-        "router": True
+        "version": "0.3.0",
+        "router": True,
+        "storage": True,
+        "jobs": True
     })
 
 
@@ -30,7 +36,7 @@ def models():
         "models": router.available_models()
     })
 
-    
+
 @app.post("/v1/director/create")
 def create_director_plan():
     data = request.get_json(silent=True) or {}
@@ -83,6 +89,87 @@ def create_plan():
         }), 500
 
 
+@app.post("/v1/projects/jobs")
+def create_project_job():
+    data = request.get_json(silent=True) or {}
+    prompt = str(data.get("prompt", "")).strip()
+
+    if len(prompt) < 3:
+        return jsonify({
+            "ok": False,
+            "error": "prompt is required"
+        }), 400
+
+    try:
+        project = storage.create_project({
+            "prompt": prompt,
+            "duration_seconds": int(
+                data.get("duration_seconds", 30)
+            ),
+            "style": str(
+                data.get("style", "cinematic")
+            ),
+            "language": str(
+                data.get("language", "فارسی")
+            ),
+            "aspect_ratio": str(
+                data.get("aspect_ratio", "16:9")
+            ),
+            "output_type": str(
+                data.get("output_type", "general")
+            ),
+        })
+
+        project = jobs.submit_director_job(project)
+
+        return jsonify({
+            "ok": True,
+            "project": project
+        }), 202
+
+    except ValueError as exc:
+        return jsonify({
+            "ok": False,
+            "error": str(exc)
+        }), 400
+
+    except Exception as exc:
+        return jsonify({
+            "ok": False,
+            "error": "internal_error",
+            "details": str(exc)
+        }), 500
+
+
+@app.get("/v1/projects/<project_id>")
+def get_project(project_id):
+    try:
+        return jsonify({
+            "ok": True,
+            "project": storage.get_project(project_id)
+        })
+    except KeyError:
+        return jsonify({
+            "ok": False,
+            "error": "project_not_found"
+        }), 404
+
+
+@app.get("/v1/projects/<project_id>/files")
+def get_project_files(project_id):
+    try:
+        storage.get_project(project_id)
+        return jsonify({
+            "ok": True,
+            "files": storage.list_files(project_id)
+        })
+    except KeyError:
+        return jsonify({
+            "ok": False,
+            "error": "project_not_found"
+        }), 404
+
+
 @app.get("/v1/llm/status")
 def llm_status():
     return jsonify({
@@ -129,7 +216,6 @@ def llm_director_request():
             "error": "internal_error",
             "details": str(exc)
         }), 500
-
 
 
 @app.post("/v1/llm/director-generate")
