@@ -24,7 +24,7 @@ import android.widget.Toast;
 
 public class MainActivity extends Activity {
 
-    private static final String BACKEND_URL = "https://mjk-video-ai.onrender.com/v1/llm/director-generate";
+    private static final String BACKEND_URL = "https://mjk-video-ai-proxy.vercel.app/v1/llm/director-generate";
 
     private final int BG = Color.rgb(10, 12, 18);
     private final int CARD = Color.rgb(22, 25, 34);
