@@ -24,7 +24,7 @@ import android.widget.Toast;
 
 public class MainActivity extends Activity {
 
-    private static final String BACKEND_URL = "https://mjk-video-ai-proxy.vercel.app/v1/llm/director-generate";
+    private static final String BACKEND_URL = "https://mjk-video-ai-proxy.vercel.app";
 
     private final int BG = Color.rgb(10, 12, 18);
     private final int CARD = Color.rgb(22, 25, 34);
@@ -36,7 +36,7 @@ public class MainActivity extends Activity {
 
     private String selectedOutputType = "youtube";
     private String selectedStyle = "cinematic";
-    private int selectedDurationSeconds = 60;
+    private int selectedDurationSeconds = 240;
     private String selectedLanguage = "فارسی";
     private String selectedAspectRatio = "9:16";
 
@@ -136,135 +136,8 @@ public class MainActivity extends Activity {
     }
 
     private void requestDirector(String userPrompt) {
-        new Thread(() -> {
-            HttpURLConnection connection = null;
-            try {
-                URL url = new URL(BACKEND_URL);
-                connection = (HttpURLConnection) url.openConnection();
-                connection.setRequestMethod("POST");
-                connection.setConnectTimeout(10000);
-                connection.setReadTimeout(120000);
-                connection.setDoOutput(true);
-                connection.setRequestProperty("Content-Type", "application/json; charset=UTF-8");
-                connection.setRequestProperty("Accept", "application/json");
-
-                JSONObject body = new JSONObject();
-                body.put("prompt", userPrompt);
-                body.put("duration_seconds", selectedDurationSeconds);
-                body.put("style", selectedStyle);
-                body.put("language", selectedLanguage);
-                body.put("aspect_ratio", selectedAspectRatio);
-                body.put("output_type", selectedOutputType);
-
-                OutputStream os = connection.getOutputStream();
-                os.write(body.toString().getBytes("UTF-8"));
-                os.flush();
-                os.close();
-
-                int statusCode = connection.getResponseCode();
-                InputStream stream = (statusCode >= 200 && statusCode < 300)
-                        ? connection.getInputStream() : connection.getErrorStream();
-
-                BufferedReader reader = new BufferedReader(new InputStreamReader(stream, "UTF-8"));
-                StringBuilder response = new StringBuilder();
-                String line;
-                while ((line = reader.readLine()) != null) response.append(line);
-                reader.close();
-
-                final String result = response.toString();
-                final int finalStatus = statusCode;
-
-                runOnUiThread(() -> {
-                    if (finalStatus >= 200 && finalStatus < 300) {
-                        try {
-                            JSONObject json = new JSONObject(result);
-                            JSONObject plan = json.optJSONObject("plan");
-
-                            StringBuilder display = new StringBuilder();
-
-                            if (plan != null) {
-                                appendResult(display, "ایده", plan.optString("concept", ""));
-                                appendResult(display, "Hook", plan.optString("hook", ""));
-                                appendResult(display, "مخاطب", plan.optString("audience", ""));
-                                appendResult(display, "سناریو", plan.optString("story", ""));
-                                appendResult(display, "CTA", plan.optString("cta", ""));
-
-                                if (plan.has("characters")) {
-                                    appendResult(display, "شخصیت‌ها",
-                                            plan.optJSONArray("characters") != null
-                                                    ? plan.optJSONArray("characters").toString()
-                                                    : plan.optString("characters", ""));
-                                }
-
-                                if (plan.has("locations")) {
-                                    appendResult(display, "لوکیشن‌ها",
-                                            plan.optJSONArray("locations") != null
-                                                    ? plan.optJSONArray("locations").toString()
-                                                    : plan.optString("locations", ""));
-                                }
-
-                                if (plan.has("scenes")) {
-                                    appendResult(display, "صحنه‌ها",
-                                            plan.optJSONArray("scenes") != null
-                                                    ? plan.optJSONArray("scenes").toString(2)
-                                                    : plan.optString("scenes", ""));
-                                }
-
-                                appendResult(display, "گویندگی", plan.optString("voiceover", ""));
-                                appendResult(display, "موسیقی", plan.optString("music", ""));
-                                appendResult(display, "افکت‌های صوتی", plan.optString("sound_effects", ""));
-                                appendResult(display, "کپشن", plan.optString("captions", ""));
-                            }
-
-                            if (display.length() == 0) {
-                                display.append("پاسخ خام AI:\n\n").append(result);
-                            }
-
-                            TextView resultView = new TextView(this);
-                            resultView.setText(display.toString());
-                            resultView.setTextColor(Color.BLACK);
-                            resultView.setTextSize(16);
-                            resultView.setPadding(dp(20), dp(16), dp(20), dp(16));
-                            resultView.setTextIsSelectable(true);
-                            resultView.setGravity(Gravity.RIGHT | Gravity.TOP);
-                            resultView.setLayoutDirection(View.LAYOUT_DIRECTION_RTL);
-
-                            ScrollView resultScroll = new ScrollView(this);
-                            resultScroll.setFillViewport(true);
-                            resultScroll.addView(resultView);
-
-                            new AlertDialog.Builder(this)
-                                    .setTitle("AI Director")
-                                    .setView(resultScroll)
-                                    .setPositiveButton("باشه", null)
-                                    .show();
-
-                        } catch (Exception e) {
-                            new AlertDialog.Builder(this)
-                                    .setTitle("AI Director")
-                                    .setMessage(result)
-                                    .setPositiveButton("باشه", null)
-                                    .show();
-                        }
-                    } else {
-                        new AlertDialog.Builder(this)
-                                .setTitle("خطا")
-                                .setMessage("Backend پاسخ موفق نداد.\n\nHTTP " + finalStatus + "\n\n" + result)
-                                .setPositiveButton("باشه", null)
-                                .show();
-                    }
-                });
-            } catch (Exception e) {
-                final String error = e.getClass().getSimpleName() + ": " + String.valueOf(e.getMessage());
-                runOnUiThread(() -> new AlertDialog.Builder(this)
-                        .setTitle("خطای اتصال")
-                        .setMessage("اتصال به AI Director برقرار نشد.\n\n" + error)
-                        .setPositiveButton("باشه", null)
-                        .show());
-            } finally {
-                if (connection != null) connection.disconnect();
-            }
-        }).start();
+        Toast.makeText(this, "تولید واقعی ویدیوی AI شروع شد...", Toast.LENGTH_SHORT).show();
+        VideoGenerator.start(this, userPrompt, selectedDurationSeconds, selectedAspectRatio);
     }
 
     @Override
@@ -344,8 +217,8 @@ public class MainActivity extends Activity {
 
         settings.addView(
                 options(
-                        new String[]{"30 ثانیه", "60 ثانیه", "چند دقیقه"},
-                        1),
+                        new String[]{"تست ۲۵ ثانیه", "۱ دقیقه", "۴ دقیقه"},
+                        2),
                 margin(6));
 
         TextView language = text("زبان گوینده", 14, MUTED, false);
